@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/wireviz-harness.schema.json",
+  "title": "WireViz Harness",
+  "type": "object",
+  "required": ["connectors", "cables", "connections"],
+  "additionalProperties": false,
+
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "description": "Free-form meta-information such as title, description, notes"
+    },
+
+    "options": {
+      "$ref": "#/$defs/Options"
+    },
+
+    "connectors": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[A-Za-z0-9_]+$": { "$ref": "#/$defs/Connector" }
+      },
+      "description": "Dictionary of connector designators"
+    },
+
+    "cables": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[A-Za-z0-9_]+$": { "$ref": "#/$defs/Cable" }
+      },
+      "description": "Dictionary of cable or bundle designators"
+    },
+
+    "connections": {
+      "type": "array",
+      "description": "List of connection sets",
+      "items": { "$ref": "#/$defs/ConnectionSet" }
+    },
+
+    "additional_bom_items": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/BOMItem" }
+    }
+  },
+
+  "$defs": {
+
+    "Options": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "bgcolor": { "$ref": "#/$defs/Color" },
+        "color_mode": {
+          "type": "string",
+          "enum": ["full", "FULL", "hex", "HEX", "short",
+                   "SHORT", "ger", "GER"]
+        },
+        "fontname": { "type": "string" },
+        "template_separator": { "type": "string", "minLength": 1 }
+      }
+    },
+
+    "Connector": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "type":       { "type": "string" },
+        "subtype":    { "type": "string" },
+        "color":      { "$ref": "#/$defs/Color" },
+        "image":      { "$ref": "#/$defs/Image" },
+        "notes":      { "type": "string" },
+
+        "pincount":   { "type": "integer", "minimum": 1 },
+        "pins":       { "$ref": "#/$defs/PinArray" },
+        "pinlabels":  { "$ref": "#/$defs/PinArray" },
+        "pincolors":  { "$ref": "#/$defs/PinArray" },
+        "loops": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "type": ["string","integer"] }
+          }
+        },
+
+        "manufacturer": { "type": "string" },
+        "mpn":          { "type": "string" },
+        "supplier":     { "type": "string" },
+        "spn":          { "type": "string" },
+        "pn":           { "type": "string" },
+        "additional_components": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AdditionalComponent" }
+        }
+      },
+
+      "oneOf": [
+        { "required": ["pincount"] },
+        { "required": ["pins"] },
+        { "required": ["pinlabels"] }
+      ]
+    },
+
+    "Cable": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "category":   { "type": "string", "enum": ["bundle"] },
+        "type":       { "type": "string" },
+        "gauge":      { "type": ["number","string"] },
+        "show_equiv": { "type": "boolean" },
+        "length":     { "type": ["number","string"] },
+        "shield":     { "type": ["boolean", "string"] },
+        "color":      { "$ref": "#/$defs/Color" },
+        "image":      { "$ref": "#/$defs/Image" },
+        "notes":      { "type": "string" },
+
+        "wirecount":  { "type": "integer", "minimum": 1 },
+        "colors":     { "$ref": "#/$defs/ColorArray" },
+        "color_code": {
+          "type": "string",
+          "enum": ["DIN","IEC","TEL","TELALT","T568A",
+                   "T568B","BW"]
+        },
+        "wirelabels": { "$ref": "#/$defs/PinArray" },
+
+        "manufacturer": { "type": "string" },
+        "mpn":          { "type": "string" },
+        "supplier":     { "type": "string" },
+        "spn":          { "type": "string" },
+        "pn":           { "type": "string" },
+        "additional_components": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AdditionalComponent" }
+        }
+      },
+
+      "oneOf": [
+        { "required": ["wirecount"] },
+        { "required": ["colors"] },
+        { "required": ["color_code", "wirecount"] }
+      ]
+    },
+
+    "ConnectionSet": {
+      "type": "array",
+      "description": "One wiring run that may include parallel pin lists",
+      "minItems": 1,
+      "items": {
+        "type": ["object","string"],
+        "description": "Either a mapping like {\"X1\": \"1\"}  or  \"-->\" for arrows"
+      }
+    },
+
+    "BOMItem": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["description","qty"],
+      "properties": {
+        "description": { "type": "string" },
+        "qty":         { "type": ["number","integer"] },
+        "unit":        { "type": "string" },
+        "designators": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "pn":           { "type": "string" },
+        "manufacturer": { "type": "string" },
+        "mpn":          { "type": "string" },
+        "supplier":     { "type": "string" },
+        "spn":          { "type": "string" }
+      }
+    },
+
+    "AdditionalComponent": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "properties": {
+        "type":       { "type": "string" },
+        "subtype":    { "type": "string" },
+        "qty":        { "type": ["number","integer"], "default": 1 },
+        "qty_multiplier": {
+          "type": "string",
+          "enum": ["pincount","populated","unpopulated",
+                   "wirecount","terminations","length","total_length"]
+        },
+        "unit":        { "type": "string" },
+        "pn":          { "type": "string" },
+        "manufacturer":{ "type": "string" },
+        "mpn":         { "type": "string" },
+        "supplier":    { "type": "string" },
+        "spn":         { "type": "string" },
+        "bgcolor":     { "$ref": "#/$defs/Color" }
+      }
+    },
+
+    "Image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src"],
+      "properties": {
+        "src":     { "type": "string" },
+        "caption": { "type": "string" },
+        "bgcolor": { "$ref": "#/$defs/Color" },
+        "width":   { "type": "integer" },
+        "height":  { "type": "integer" },
+        "scale": {
+          "type": ["string","boolean"],
+          "enum": [false,true,"width","height","both"]
+        },
+        "fixedsize": { "type": "boolean" }
+      }
+    },
+
+    "Color": {
+      "type": "string",
+      "description": "Two-letter code (BK, RD, …) or hex (#RRGGBB)"
+    },
+
+    "ColorArray": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Color" }
+    },
+
+    "PinArray": {
+      "type": "array",
+      "items": { "type": ["string","integer"] }
+    }
+  }
+}

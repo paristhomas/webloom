@@ -1,0 +1,2 @@
+[console_scripts]
+wireviz = wireviz.wv_cli:wireviz
