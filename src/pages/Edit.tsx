@@ -1,40 +1,17 @@
-/*
-  Edit.tsx – complete rewrite (July 2025)
-  -------------------------------------------------
-  MVP GUI for WireViz harness editing.
-  Technologies used:
-    • React 18 + TypeScript
-    • react-jsonschema-form (@rjsf/core) for auto-generated form UI
-    • js-yaml to convert between JSON ⇄ YAML
-    • file-saver to download YAML locally
-    • Tailwind CSS for styling, Framer-Motion for subtle animations
-
-  Installation hints (one-off):
-    pnpm add @rjsf/core js-yaml file-saver framer-motion
-
-  You’ll also need the JSON Schema we drafted earlier saved as
-  `src/schema/harnessSchema.json` (or adjust the import path below).
-*/
-
 import React, { useState, useEffect } from "react";
-import Form, { IChangeEvent } from "@rjsf/core";
+import Form, { type IChangeEvent } from "@rjsf/core";
+import validator from "@rjsf/validator-ajv8";
 import YAML from "js-yaml";
 import { saveAs } from "file-saver";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 import harnessSchema from "../schema/harnessSchema.json";
 
-// ---------------------------------------------------------------------------
-// Type helpers
-// ---------------------------------------------------------------------------
-
 type Harness = Record<string, unknown>;
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
 const Edit: React.FC = () => {
+  const navigate = useNavigate();
   const schema = harnessSchema as const;
 
   const [tab, setTab] = useState<"form" | "yaml">("form");
@@ -42,22 +19,15 @@ const Edit: React.FC = () => {
   const [yamlText, setYamlText] = useState<string>("");
   const [yamlError, setYamlError] = useState<string | null>(null);
 
-  // -------------------------------------------------------------------------
-  // Synchronise -> YAML when form changes
-  // -------------------------------------------------------------------------
   useEffect(() => {
     try {
       setYamlText(YAML.dump(formData, { lineWidth: 120 }));
       setYamlError(null);
     } catch (err) {
-      console.error("YAML dump error", err);
       setYamlError((err as Error).message);
     }
   }, [formData]);
 
-  // -------------------------------------------------------------------------
-  // Synchronise -> form when YAML textarea edited (only on YAML tab)
-  // -------------------------------------------------------------------------
   useEffect(() => {
     if (tab !== "yaml") return;
     try {
@@ -69,14 +39,8 @@ const Edit: React.FC = () => {
     }
   }, [yamlText, tab]);
 
-  // -------------------------------------------------------------------------
-  // Form change handler
-  // -------------------------------------------------------------------------
   const onChange = (e: IChangeEvent) => setFormData(e.formData);
 
-  // -------------------------------------------------------------------------
-  // Helpers: download + upload YAML
-  // -------------------------------------------------------------------------
   const handleDownload = () => {
     const blob = new Blob([yamlText], { type: "text/yaml;charset=utf-8;" });
     saveAs(blob, "harness.yaml");
@@ -88,13 +52,29 @@ const Edit: React.FC = () => {
     file.text().then((txt) => setYamlText(txt));
   };
 
-  // -------------------------------------------------------------------------
-  // UI
-  // -------------------------------------------------------------------------
+  const handleRender = async () => {
+    const formDataObj = new FormData();
+    formDataObj.append(
+      "yml_file",
+      new Blob([yamlText], { type: "text/yaml" }),
+      "harness.yml"
+    );
+
+    const res = await fetch(import.meta.env.VITE_API_URL + "/render", {
+      method: "POST",
+      headers: { Accept: "text/html" },
+      body: formDataObj,
+    });
+
+    const html = await res.text();
+    sessionStorage.setItem("lastYaml", yamlText);
+    sessionStorage.setItem("lastHtml", html);
+    navigate("/preview");
+  };
+
   return (
-    <div className="p-4 grid gap-4 max-w-screen-lg mx-auto">
-      {/* Tabs */}
-      <div className="flex gap-2">
+    <div style={{ padding: "1rem", maxWidth: "800px", margin: "0 auto" }}>
+      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
         {([
           ["form", "Form"],
           ["yaml", "YAML"],
@@ -102,19 +82,21 @@ const Edit: React.FC = () => {
           <button
             key={value}
             onClick={() => setTab(value)}
-            className={`px-4 py-2 rounded-2xl text-sm font-medium shadow transition-all
-              ${
-                tab === value
-                  ? "bg-indigo-600 text-white"
-                  : "bg-gray-200 hover:bg-gray-300"
-              }`}
+            style={{
+              padding: "0.5rem 1rem",
+              borderRadius: "0.5rem",
+              fontWeight: 500,
+              border: "1px solid #ccc",
+              backgroundColor: tab === value ? "#4f46e5" : "#eee",
+              color: tab === value ? "white" : "black",
+              cursor: "pointer",
+            }}
           >
             {label}
           </button>
         ))}
       </div>
 
-      {/* Content */}
       <AnimatePresence mode="wait">
         {tab === "form" ? (
           <motion.div
@@ -123,14 +105,33 @@ const Edit: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.15 }}
-            className="bg-white p-4 rounded-2xl shadow"
+            style={{
+              padding: "1rem",
+              border: "1px solid #ddd",
+              borderRadius: "0.5rem",
+            }}
           >
             <Form
               schema={schema}
               formData={formData}
               onChange={onChange}
               liveValidate
+              validator={validator}
             />
+            <button
+              onClick={handleRender}
+              style={{
+                marginTop: "1rem",
+                backgroundColor: "#4f46e5",
+                color: "white",
+                padding: "0.5rem 1rem",
+                border: "none",
+                borderRadius: "0.5rem",
+                cursor: "pointer",
+              }}
+            >
+              Generate Diagram
+            </button>
           </motion.div>
         ) : (
           <motion.div
@@ -139,38 +140,67 @@ const Edit: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.15 }}
-            className="flex flex-col"
           >
             <textarea
               value={yamlText}
               onChange={(e) => setYamlText(e.target.value)}
-              className="font-mono text-sm p-3 min-h-[60vh] resize-vertical rounded-xl shadow-inner border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              style={{
+                width: "100%",
+                minHeight: "300px",
+                fontFamily: "monospace",
+                fontSize: "0.9rem",
+                padding: "0.5rem",
+                borderRadius: "0.5rem",
+                border: "1px solid #ccc",
+              }}
             />
-
             {yamlError && (
-              <p className="mt-2 text-sm text-red-600">{yamlError}</p>
+              <p style={{ color: "red", marginTop: "0.5rem" }}>{yamlError}</p>
             )}
-
-            <div className="flex gap-2 mt-4">
+            <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
               <input
                 type="file"
                 id="yaml-upload"
                 accept=".yaml,.yml"
-                className="hidden"
+                style={{ display: "none" }}
                 onChange={handleUpload}
               />
               <label
                 htmlFor="yaml-upload"
-                className="cursor-pointer bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg shadow"
+                style={{
+                  padding: "0.5rem 1rem",
+                  backgroundColor: "#eee",
+                  borderRadius: "0.5rem",
+                  cursor: "pointer",
+                }}
               >
                 Upload YAML
               </label>
-
               <button
                 onClick={handleDownload}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg shadow"
+                style={{
+                  backgroundColor: "#4f46e5",
+                  color: "white",
+                  padding: "0.5rem 1rem",
+                  border: "none",
+                  borderRadius: "0.5rem",
+                  cursor: "pointer",
+                }}
               >
                 Download YAML
+              </button>
+              <button
+                onClick={handleRender}
+                style={{
+                  backgroundColor: "#16a34a",
+                  color: "white",
+                  padding: "0.5rem 1rem",
+                  border: "none",
+                  borderRadius: "0.5rem",
+                  cursor: "pointer",
+                }}
+              >
+                Generate Diagram
               </button>
             </div>
           </motion.div>

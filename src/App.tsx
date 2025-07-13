@@ -1,3 +1,4 @@
+// src/App.tsx
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Edit from "./pages/Edit";
 import Preview from "./pages/Preview";
